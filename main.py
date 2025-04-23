@@ -24,9 +24,9 @@ def get_labels():
       flow = InstalledAppFlow.from_client_secrets_file(
           "credentials.json", SCOPES
       )
-      creds = flow.run_local_server(bind_addr="0.0.0.0",port=8002)
+      creds = flow.run_local_server(bind_addr="0.0.0.0",open_browser=False,port=8002)
       print(creds.to_json())
-    with open("token.json", "w") as token:
+    with open("/app/token.json", "w") as token:
       token.write(creds.to_json())
 
   try:
@@ -47,4 +47,4 @@ def get_labels_route():
   return jsonify({"labels": labels})
 
 if __name__ == "__main__":
-  app.run(debug=True,host="0.0.0.0",port=8001)
+  app.run(debug=False,host="0.0.0.0",port=8001)
