@@ -24,8 +24,7 @@ class GmailService():
                     "credentials.json", scopes
                 )
                 creds = flow.run_local_server(bind_addr="0.0.0.0",open_browser=False,port=8002)
-                # print(creds.to_json())
-            
+                            
             with open("/app/creds/token.json", "w") as token:
                 token.write(creds.to_json())
 
@@ -38,9 +37,7 @@ class GmailService():
     def get_labels(self):
         try:
             results = self.service.users().labels().list(userId="me").execute()
-            # print(results)
             labels = results.get("labels", [])
-            # print(results)
             if not labels:
                 return []
             return [label["name"] for label in labels]
@@ -56,12 +53,10 @@ class GmailService():
             .list(userId="me",q=f'label:inbox AND label:unread' , maxResults=limit)
             .execute()
         )
-        print(results)
         latest_unread = results.get("messages", [])
         if latest_unread :
             latest_id = latest_unread[0]['id']
             response = self.service.users().messages().get(userId="me", id=latest_id).execute()
-            print(response)
             final_message = ""
             parts = response["payload"].get("parts",[])
             if len(parts) == 0 :
@@ -72,9 +67,7 @@ class GmailService():
                 decoded = base64.b64decode(content).decode("utf-8")
                 final_message += decoded
                 break
-            # headers = ['From','Subject']
-            # print(response)
-            print(final_message)
+          
             headers = {header['name']:header['value'] for header in response["payload"]["headers"]}
             meta = {
 
@@ -113,21 +106,17 @@ class GmailService():
         message["Subject"] = 'Re: '+latest_email['meta']['subject']
         message['In-Reply-To'] = latest_email['meta']['reply_message_id']
         message['References'] = latest_email['meta']['reply_message_id']
-        # print(message)  
-
         # encoded message
         encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
         create_message = {"message": {"raw": encoded_message,"threadId":latest_email['meta']['thread_id']}}
-        # pylint: disable=E1101
         draft = (
             self.service.users()
             .drafts()
             .create(userId="me", body=create_message)
             .execute()
         )
-        # print(f'Draft id: {draft["id"]}\nDraft message: {draft["message"]}')
-
+    
         return {
             'message_id' :latest_email['meta']['message_id'],
             'message': latest_email['message'],
