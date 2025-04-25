@@ -30,6 +30,7 @@ RUN adduser \
 
 # Give appuser ownership and permissions to create and read /app directory
 RUN chown -R appuser:appuser /app && chmod -R u+rwX /app
+# RUN chown -R appuser:appuser /app/creds && chmod -R u+rwX /app/creds
 
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /root/.cache/pip to speed up subsequent builds.
@@ -42,7 +43,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Switch to the non-privileged user to run the application.
 USER appuser
 
-
+RUN mkdir /app/creds
 # Copy the source code into the container.
 COPY . .
 
