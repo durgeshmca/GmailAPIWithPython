@@ -1,78 +1,76 @@
-from flask import Flask, jsonify
-from flask import request
 
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from services.gmail_service import GmailService
 from services.llm_service import LLM
-# If modifying these scopes, delete the file token.json.
-app = Flask(__name__)
+
+app = FastAPI()
+
+class ReplyRequest(BaseModel):
+    content: str
+    from_: str = None
 
 def get_labels():
-  SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-  try:
-    gmail = GmailService(SCOPES)
-    labels = gmail.get_labels()
-    return labels
-  except Exception as e:
-    return {"error": str(e)}
-  
+    SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+    try:
+        gmail = GmailService(SCOPES)
+        labels = gmail.get_labels()
+        return labels
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/get_labels")
+async def get_labels_route():
+    labels = get_labels()
+    if isinstance(labels, dict) and "error" in labels:
+        raise HTTPException(status_code=500, detail=labels["error"])
+    return {"labels": labels}
 
-@app.route("/get_labels")
-def get_labels_route():
-  labels = get_labels()
-  if isinstance(labels, dict) and "error" in labels:
-    return jsonify(labels), 500
-  return jsonify({"labels": labels})
+@app.get("/get_latest_email")
+async def get_email_route():
+    SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
+    try:
+        gmail = GmailService(SCOPES)
+        emails = gmail.get_latest_emails()
+        return {"emails": emails}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/get_reply")
+async def get_reply(data: ReplyRequest):
+    if not data.content:
+        raise HTTPException(status_code=400, detail="Missing 'content' key in JSON body")
+    try:
+        llm = LLM()
+        reply = llm.get_reply(data.content, data.from_)
+        return {"content": reply}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.route("/get_latest_email")
-def get_email_route():
-  SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
-  try:
-    gmail = GmailService(SCOPES)
-    emails = gmail.get_latest_emails()
-    return jsonify({"emails": emails})
-  except Exception as e:
-    return jsonify({"error": str(e)}), 500
-
-@app.route("/get_reply", methods=["POST"])
-def get_reply():
-  
-  data = None
-  if not (data := request.get_json()):
-    return jsonify({"error": "Missing JSON body"}), 400
-  content = data.get("content")
-  if content is None:
-    return jsonify({"error": "Missing 'content' key in JSON body"}), 400
-  try:
-    llm = LLM()
-    reply = llm.get_reply(content,data.get("from"))
-    return jsonify({"content": reply})
-  except Exception as e:
-    return jsonify({"error": str(e)}), 500
-
-@app.route("/create_draft", methods=["POST"])
-def create_reply_draft():
-  
-  SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    'https://www.googleapis.com/auth/gmail.compose',
-    'https://www.googleapis.com/auth/calendar'
+@app.post("/create_draft")
+async def create_reply_draft():
+    SCOPES = [
+        "https://www.googleapis.com/auth/gmail.readonly",
+        'https://www.googleapis.com/auth/gmail.compose',
+        'https://www.googleapis.com/auth/calendar'
     ]
-  try:
-    gmail = GmailService(SCOPES)
-    response = gmail.create_draft_email()
-    return jsonify(response)
-  except Exception as e:
-    return jsonify({"error": str(e)}), 500
+    try:
+        gmail = GmailService(SCOPES)
+        response = gmail.create_draft_email()
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-  response = {
-    "error": str(e)
-  }
-  return jsonify(response), 500
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"error": str(exc)},
+    )
 
 if __name__ == "__main__":
-  app.run(debug=True,host="0.0.0.0",port=8001)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="debug")
+
 
