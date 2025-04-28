@@ -1,38 +1,10 @@
-
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 from email.message import EmailMessage
-from llm_service import LLM
-import os
+from services.llm_service import LLM
+from services.google_service import GoogleService
 import base64
-class GmailService():
+class GmailService(GoogleService):
     def __init__(self,scopes):
-        self.service = self._get_service(scopes)
-        
-    def _get_service(self,scopes):
-        creds = None
-        if os.path.exists("creds/token.json"):
-            creds = Credentials.from_authorized_user_file("creds/token.json", scopes)
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    "credentials.json", scopes
-                )
-                creds = flow.run_local_server(bind_addr="0.0.0.0",open_browser=False,port=8002)
-                            
-            with open("/app/creds/token.json", "w") as token:
-                token.write(creds.to_json())
-
-        try:
-            service = build("gmail", "v1", credentials=creds)
-            return service
-        except HttpError as error:
-            return {"error": str(error)}
+        super().__init__(scopes,'gmail')
     
     def get_labels(self):
         try:
@@ -91,7 +63,8 @@ class GmailService():
         latest_email = self.get_latest_emails()
         # generate reply
         reply = self.get_message_reply(latest_email)
-        if reply['reply']=='NA':
+        # print(reply)
+        if reply['reply']['output']=='NA':
          
          return {
             "notice":"Latest message is not relevant to create draft.",
@@ -99,7 +72,7 @@ class GmailService():
             }
         
         message = EmailMessage()
-        message.set_content(reply['reply'])
+        message.set_content(reply['reply']['output'])
 
         message["To"] = latest_email['meta']['from']
         message["From"] = latest_email['meta']['to']
